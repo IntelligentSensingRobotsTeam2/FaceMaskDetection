@@ -7,11 +7,17 @@ from utils.anchor_decode import decode_bbox
 from utils.nms import single_class_non_max_suppression
 from PIL import Image, ImageDraw, ImageFont
 import time
+import face_recognition
+
 
 # anchor configuration
 feature_map_sizes = [[33, 33], [17, 17], [9, 9], [5, 5], [3, 3]]
 anchor_sizes = [[0.04, 0.056], [0.08, 0.11], [0.16, 0.22], [0.32, 0.45], [0.64, 0.72]]
 anchor_ratios = [[1, 0.62, 0.42]] * 5
+
+admin_img = face_recognition.load_image_file("faces/admin.jpg")
+admin_face_encoding = face_recognition.face_encodings(admin_img)[0]
+
 
 # generate anchors
 anchors = generate_anchors(feature_map_sizes, anchor_sizes, anchor_ratios)
@@ -23,6 +29,8 @@ anchors_exp = np.expand_dims(anchors, axis=0)
 id2class = {0: 'Mask', 1: 'NoMask'}
 id2chiclass = {0: '您戴了口罩', 1: '您没有戴口罩'}
 colors = ((0, 255, 0), (255, 0 , 0))
+
+
 
 def puttext_chinese(img, text, point, color):
     pilimg = Image.fromarray(img)
@@ -42,6 +50,11 @@ def getOutputsNames(net):
     # Get the names of the output layers, i.e. the layers with unconnected outputs
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
+def recognition(image,face_locations):
+    ## do recognition when only one face show.
+    face_encoding = face_recognition.face_encodings(image, face_locations)[0]
+    return face_recognition.compare_faces([admin_face_encoding], face_encoding,tolerance=0.4)
+
 def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 160), draw_result=True, chinese=False):
     height, width, _ = image.shape
     blob = cv2.dnn.blobFromImage(image, scalefactor=1/255.0, size=target_shape)
@@ -58,6 +71,7 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
     keep_idxs = single_class_non_max_suppression(y_bboxes, bbox_max_scores, conf_thresh=conf_thresh, iou_thresh=iou_thresh)
     # keep_idxs  = cv2.dnn.NMSBoxes(y_bboxes.tolist(), bbox_max_scores.tolist(), conf_thresh, iou_thresh)[:,0]
     tl = round(0.002 * (height + width) * 0.5) + 1  # line thickness
+
     for idx in keep_idxs:
         conf = float(bbox_max_scores[idx])
         class_id = bbox_max_score_classes[idx]
@@ -67,13 +81,22 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
         ymin = max(0, int(bbox[1] * height))
         xmax = min(int(bbox[2] * width), width)
         ymax = min(int(bbox[3] * height), height)
+
+        label,color = id2chiclass[class_id],colors[class_id]
+        if len(keep_idxs) == 1:
+            match = recognition(image,[(ymin,xmax,ymax,xmin)])
+            print('recog:',match)
+            if match:
+                label = 'admin'
+                color = colors[0]
+        # (left, top), (right, bottom)
         if draw_result:
-            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), colors[class_id]) #, thickness=tl
+            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color) #, thickness=tl
             if chinese:
-                image = puttext_chinese(image, id2chiclass[class_id], (xmin, ymin), colors[class_id])  ###puttext_chinese
+                image = puttext_chinese(image,label , (xmin, ymin),color)  ###puttext_chinese
             else:
-                cv2.putText(image, "%s: %.2f" % (id2class[class_id], conf), (xmin + 2, ymin - 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[class_id])
+                cv2.putText(image, "%s" % (label), (xmin + 2, ymin - 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color)
     return image
 
 def run_on_video(Net, video_path, conf_thresh=0.5):

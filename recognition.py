@@ -15,7 +15,7 @@ import numpy as np
 video_capture = cv2.VideoCapture(0)
 
 # Load a sample picture and learn how to recognize it.
-obama_image = face_recognition.load_image_file("faces/Ding.jpg")
+obama_image = face_recognition.load_image_file("faces/admin.jpg")
 obama_face_encoding = face_recognition.face_encodings(obama_image)[0]
 
 # Load a second sample picture and learn how to recognize it.
@@ -28,8 +28,7 @@ known_face_encodings = [
     # biden_face_encoding
 ]
 known_face_names = [
-    "41",
-    # "Joe Biden"
+    "admin"
 ]
 
 # Initialize some variables
@@ -52,6 +51,7 @@ while True:
     if process_this_frame:
         # Find all the faces and face encodings in the current frame of video
         face_locations = face_recognition.face_locations(rgb_small_frame)
+        print(face_locations)
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         face_names = []
@@ -59,7 +59,7 @@ while True:
             # See if the face is a match for the known face(s)
             matches = face_recognition.compare_faces(known_face_encodings, face_encoding,tolerance=0.4)
             name = "Unknown"
-
+            print(matches)
             # # If a match was found in known_face_encodings, just use the first one.
             # if True in matches:
             #     first_match_index = matches.index(True)
