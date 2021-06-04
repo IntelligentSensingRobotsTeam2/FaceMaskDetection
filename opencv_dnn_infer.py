@@ -8,7 +8,7 @@ from utils.nms import single_class_non_max_suppression
 from PIL import Image, ImageDraw, ImageFont
 import time
 import face_recognition
-
+from utils import udp_send
 
 # anchor configuration
 feature_map_sizes = [[33, 33], [17, 17], [9, 9], [5, 5], [3, 3]]
@@ -29,7 +29,7 @@ anchors_exp = np.expand_dims(anchors, axis=0)
 id2class = {0: 'Mask', 1: 'NoMask'}
 id2chiclass = {0: '您戴了口罩', 1: '您没有戴口罩'}
 colors = ((0, 255, 0), (255, 0 , 0))
-
+frame_cnt = 0
 
 
 def puttext_chinese(img, text, point, color):
@@ -56,6 +56,7 @@ def recognition(image,face_locations):
     return face_recognition.compare_faces([admin_face_encoding], face_encoding,tolerance=0.4)
 
 def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 160), draw_result=True, chinese=False):
+    global frame_cnt
     height, width, _ = image.shape
     blob = cv2.dnn.blobFromImage(image, scalefactor=1/255.0, size=target_shape)
     net.setInput(blob)
@@ -72,6 +73,7 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
     # keep_idxs  = cv2.dnn.NMSBoxes(y_bboxes.tolist(), bbox_max_scores.tolist(), conf_thresh, iou_thresh)[:,0]
     tl = round(0.002 * (height + width) * 0.5) + 1  # line thickness
 
+    sending_data = ''
     for idx in keep_idxs:
         conf = float(bbox_max_scores[idx])
         class_id = bbox_max_score_classes[idx]
@@ -82,13 +84,21 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
         xmax = min(int(bbox[2] * width), width)
         ymax = min(int(bbox[3] * height), height)
 
-        label,color = id2chiclass[class_id],colors[class_id]
+        label,color = id2class[class_id],colors[class_id]
         if len(keep_idxs) == 1:
-            match = recognition(image,[(ymin,xmax,ymax,xmin)])
+            match = recognition(image,[(ymin,xmax,ymax,xmin)])[0]
             print('recog:',match)
-            if match:
-                label = 'admin'
-                color = colors[0]
+        if match:
+            label = 'admin'
+            color = colors[0]
+            sending_data = 'admin:1'
+        else:
+            sending_data = 'mask:0'
+
+        # print('label:',label)
+        if frame_cnt % 16 == 0:
+            udp_send.send_data(sending_data)
+
         # (left, top), (right, bottom)
         if draw_result:
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color) #, thickness=tl
@@ -105,6 +115,7 @@ def run_on_video(Net, video_path, conf_thresh=0.5):
         raise ValueError("Video open failed.")
     
     startTime = time.time()
+    global frame_cnt
     frame_cnt = 0
     status = True
 
