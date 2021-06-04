@@ -14,6 +14,7 @@ from utils import udp_send
 feature_map_sizes = [[33, 33], [17, 17], [9, 9], [5, 5], [3, 3]]
 anchor_sizes = [[0.04, 0.056], [0.08, 0.11], [0.16, 0.22], [0.32, 0.45], [0.64, 0.72]]
 anchor_ratios = [[1, 0.62, 0.42]] * 5
+frame_rate_limit = 6
 
 admin_img = face_recognition.load_image_file("faces/admin.jpg")
 admin_face_encoding = face_recognition.face_encodings(admin_img)[0]
@@ -52,7 +53,12 @@ def getOutputsNames(net):
 
 def recognition(image,face_locations):
     ## do recognition when only one face show.
-    face_encoding = face_recognition.face_encodings(image, face_locations)[0]
+    # print('recog size:',image.shape)
+    resize_rate = 0.25
+    ymin,xmax,ymax,xmin = [int(resize_rate*i) for i in face_locations]
+
+    small_frame = cv2.resize(image, (0, 0), fx=resize_rate, fy=resize_rate)
+    face_encoding = face_recognition.face_encodings(small_frame, [(ymin,xmax,ymax,xmin)])[0]
     return face_recognition.compare_faces([admin_face_encoding], face_encoding,tolerance=0.4)
 
 def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 160), draw_result=True, chinese=False):
@@ -86,8 +92,8 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
 
         label,color = id2class[class_id],colors[class_id]
         if len(keep_idxs) == 1:
-            match = recognition(image,[(ymin,xmax,ymax,xmin)])[0]
-            print('recog:',match)
+            match = recognition(image,[ymin,xmax,ymax,xmin])[0]
+            # print('recog:',match)
         if match:
             label = 'admin'
             color = colors[0]
@@ -110,30 +116,38 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
     return image
 
 def run_on_video(Net, video_path, conf_thresh=0.5):
+    global frame_rate_limit
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError("Video open failed.")
     
     startTime = time.time()
     global frame_cnt
-    frame_cnt = 0
+    frame_cnt = 1
     status = True
 
     while status:
         status, img_raw = cap.read()
+        curTime = time.time()
         if not status:
             print("Done processing !!!")
             break
+        if frame_cnt % 30 == 0:  ## 30 frame period per count; then zero recount from zero.
+            frame_cnt = 1
+            startTime = curTime
+        else:         
+            frame_rate = frame_cnt/(time.time()-startTime)   
+            if frame_cnt % 5 == 0:
+                print('FPS:',frame_rate)
         
-        frame_cnt+=1
-        print(frame_cnt/(time.time()-startTime))
-        
-        img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
-        img_raw = inference(Net, img_raw, target_shape=(260, 260), conf_thresh=conf_thresh)
-        cv2.imshow('image', img_raw[:,:,::-1])
-        cv2.waitKey(1)
+        if frame_rate <= frame_rate_limit:  # restrict frame rate to given threshold.
+            frame_cnt+=1
+            img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB)
+            img_raw = inference(Net, img_raw, target_shape=(260, 260), conf_thresh=conf_thresh)
+            cv2.imshow('image', img_raw[:,:,::-1])
+            cv2.waitKey(3)
     cv2.destroyAllWindows()
-
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Face Mask Detection")
     parser.add_argument('--proto', type=str, default='models/face_mask_detection.prototxt', help='prototxt path')
