@@ -98,10 +98,12 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
             label = 'admin'
             color = colors[0]
             sending_data = 'admin:1'
-        else:
+        elif class_id == 1:
             sending_data = 'mask:0'
-
+        elif class_id == 0:
+            sending_data = 'mask:1'
         # print('label:',label)
+        
         if frame_cnt % 16 == 0:
             udp_send.send_data(sending_data)
 
