@@ -13,12 +13,10 @@ import time
 from utils import udp_send
 import face_recognition
 from std_msgs.msg import String
-import os
 
-abs_dir=__file__.split('/')[0]
 
-admin_pic_path = os.path.join(abs_dir,'faces/admin.jpg')
-admin_img = face_recognition.load_image_file(admin_pic_path)
+
+admin_img = face_recognition.load_image_file("faces/admin.jpg")
 admin_face_encoding = face_recognition.face_encodings(admin_img)[0]
 
 
@@ -110,6 +108,10 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
         ymax = min(int(bbox[3] * height), height)
 
 
+
+
+
+
         label,color = id2class[class_id],colors[class_id]
         if len(keep_idxs) == 1:
             match = recognition(image,[ymin,xmax,ymax,xmin])[0]
@@ -125,8 +127,9 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
         elif class_id == 0 and sending_data != 'admin:1' and sending_data != 'mask:0':
             sending_data = 'mask:1'
         # print('label:',label)
-        
-    
+
+
+
         if ymin == 0:
          pub = rospy.Publisher('camera_angle', String, queue_size=10)
          hello_str = "up" 
@@ -148,14 +151,11 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
                         # cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[class_id])
                         cv2.FONT_HERSHEY_SIMPLEX , 2, colors[class_id], 4)
 
-
-
-
+    
     if frame_cnt % 16 == 0 and len(keep_idxs) > 0:
         udp_send.send_data(sending_data)
 
     return image
-
 
 
 def callback(data):
