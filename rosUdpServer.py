@@ -60,6 +60,39 @@ def rotate(angle):
     velocity_publisher.publish(vel_msg)
 
 
+
+
+
+
+def forward(dis):    
+        # 定义在/cmd_vel Topic中发布Twist消息，控制机器人速度
+        self.cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10) 
+        rate = 50 
+        # 设置更新频率为50HZ
+        r = rospy.Rate(rate) 
+        # 线速度
+        linear_speed = 0.2 
+        # 目标距离
+        goal_distance = dis
+        # 到达目标的时间
+        linear_duration = goal_distance / linear_speed
+         
+        move_cmd = Twist()
+            # Set the forward speed
+        move_cmd.linear.x = linear_speed
+            # 机器人向前运动，延时一定时间
+        ticks = int(linear_duration * rate)
+        for t in range(ticks):
+            self.cmd_vel.publish(move_cmd)
+            r.sleep()
+
+        self.cmd_vel.publish(Twist())
+
+
+
+
+
+
 def pump_start():
       pub = rospy.Publisher('pump_start', String, queue_size=10)
       hello_str = "1" 
@@ -117,24 +150,31 @@ def start_server():
             print(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(now)))
             
             print("recv from %s, data: %s\n" % (client, decode_data))
-
+        
+        
         cmd = decode_data.split(':')[0]
-        if cmd == 'pump_start':
-            pump_start()
-        elif cmd == 'pump_close':
-            pump_close()
-        elif cmd == 'walk_start':
-            walk_start()
-        elif cmd == 'walk_close':
-            walk_close()
-
-        elif cmd == 'rotate':
-            angle = decode_data.split(':')[1]    
+        value = int(decode_data.split(':')[1])
+        if cmd == 'spray':
+            if value == 1:
+                pump_start()
+                walk_start()
+            elif value == 0:
+                pump_close()
+                walk_close()
+        elif cmd == 'walk':
+            if value == 1:
+                walk_start()
+            elif value == 0:
+                walk_close()
+        elif cmd == 'rotate':   
         #try:
-        # Testing our function
-            rotate(int(angle))
+        # Testing our functionS
+            rotate(value)
         #except rospy.ROSInterruptException:
          #   pass
+
+        elif cmd == 'forward': ## go straight
+            forward(value)
 
 
 if __name__ == '__main__':
