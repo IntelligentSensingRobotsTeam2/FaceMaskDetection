@@ -12,6 +12,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import time 
 from utils import udp_send
 import face_recognition
+from std_msgs.msg import String
+
 
 
 admin_img = face_recognition.load_image_file("faces/admin.jpg")
@@ -124,17 +126,17 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
             udp_send.send_data(sending_data)
 
 
-
         if ymin == 0:
-           sending_data = 'up'
-           udp_send.send_data(sending_data)
-  
-        if ymax == 2048:
-           sending_data = 'down'
-           udp_send.send_data(sending_data)
+         pub = rospy.Publisher('camera_angle', String, queue_size=10)
+         hello_str = "up" 
+         rospy.loginfo(hello_str)
+         pub.publish(hello_str) 
       
-
-
+        if ymax == 2048:
+         pub = rospy.Publisher('camera_angle', String, queue_size=10)
+         hello_str = "down" 
+         rospy.loginfo(hello_str)
+         pub.publish(hello_str) 
        
         if draw_result:
             cv2.rectangle(image, (xmin, ymin), (xmax, ymax), colors[class_id], thickness=10)
@@ -168,7 +170,7 @@ def callback(data):
 
 def displayWebcam():
     rospy.init_node('webcam_display', anonymous=True)
-    global frame_cnt,startTime
+    global frame_cnt,startTime,bridge
     frame_cnt = 1
     startTime = time.time()
     bridge = CvBridge()
