@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 import face_recognition
 from utils import udp_send
+import os
 
 # anchor configuration
 feature_map_sizes = [[33, 33], [17, 17], [9, 9], [5, 5], [3, 3]]
@@ -16,7 +17,10 @@ anchor_sizes = [[0.04, 0.056], [0.08, 0.11], [0.16, 0.22], [0.32, 0.45], [0.64, 
 anchor_ratios = [[1, 0.62, 0.42]] * 5
 frame_rate_limit = 6
 
-admin_img = face_recognition.load_image_file("faces/admin.jpg")
+abs_dir=__file__.split('/')[0]
+
+admin_pic_path = os.path.join(abs_dir,'faces/admin.jpg')
+admin_img = face_recognition.load_image_file(admin_pic_path)
 admin_face_encoding = face_recognition.face_encodings(admin_img)[0]
 
 
@@ -98,14 +102,13 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
             label = 'admin'
             color = colors[0]
             sending_data = 'admin:1'
-        elif class_id == 1:
+
+        elif class_id == 1 and sending_data != 'admin:1':
             sending_data = 'mask:0'
-        elif class_id == 0:
+
+        elif class_id == 0 and sending_data != 'admin:1' and sending_data != 'mask:0':
             sending_data = 'mask:1'
         # print('label:',label)
-        
-        if frame_cnt % 16 == 0:
-            udp_send.send_data(sending_data)
 
         # (left, top), (right, bottom)
         if draw_result:
@@ -115,6 +118,10 @@ def inference(net, image, conf_thresh=0.5, iou_thresh=0.4, target_shape=(160, 16
             else:
                 cv2.putText(image, "%s" % (label), (xmin + 2, ymin - 2),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, color)
+    
+    if frame_cnt % 16 == 0 and len(keep_idxs) > 0:
+        udp_send.send_data(sending_data)
+
     return image
 
 def run_on_video(Net, video_path, conf_thresh=0.5):
@@ -160,7 +167,9 @@ if __name__ == "__main__":
     # parser.add_argument('--hdf5', type=str, help='keras hdf5 file')
     args = parser.parse_args()
 
-    Net = cv2.dnn.readNet(args.model, args.proto)
+    model_dir = os.path.join(abs_dir,args.model)
+    proto_dir = os.path.join(abs_dir,args.proto)
+    Net = cv2.dnn.readNet(model_dir, proto_dir)
     if args.img_mode:
         img = cv2.imread(args.img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
