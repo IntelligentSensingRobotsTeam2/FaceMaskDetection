@@ -1,7 +1,12 @@
-## mask detection:
-`python opencv_dnn_infer.py`
+## Run:
+local camera or videos: `python opencv_dnn_infer.py`   
+Ros video frame stream: `python ros_opencv_dnn_infer.py`
 
-## face recognition
+## source
+### mask detection
+https://github.com/AIZOOTech/FaceMaskDetection
+
+### face recognition
 https://github.com/ageitgey/face_recognition/blob/master/README_Simplified_Chinese.md
 
 
